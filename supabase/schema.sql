@@ -159,12 +159,14 @@ create policy "Owners can insert their own employee record"
 -- 3. Subscriptions
 create table public.subscriptions (
     id uuid primary key default gen_random_uuid(),
-    organization_id uuid not null references public.organizations(id) on delete cascade,
+    organization_id uuid not null references public.organizations(id) on delete cascade unique,
     plan_name text not null,
     status text not null check (status in ('active', 'inactive', 'cancelled', 'expired')),
     started_at timestamptz not null default now(),
     expires_at timestamptz not null,
-    created_at timestamptz not null default now()
+    created_at timestamptz not null default now(),
+    billing_cycle text check (billing_cycle in ('monthly', 'annual')),
+    price_paid numeric(10, 2)
 );
 
 -- Enable RLS for subscriptions
