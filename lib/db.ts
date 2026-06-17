@@ -22,6 +22,8 @@ export interface Subscription {
   started_at: string;
   expires_at: string;
   created_at: string;
+  billing_cycle?: 'monthly' | 'annual';
+  price_paid?: number;
 }
 
 export interface Customer {
@@ -241,16 +243,33 @@ class LocalDatabase {
     return data;
   }
 
-  async updateSubscription(orgId: string, status: Subscription['status'], planName?: string): Promise<Subscription> {
+  async updateSubscription(
+    orgId: string, 
+    status: Subscription['status'], 
+    planName?: string,
+    expiresAt?: string,
+    billingCycle?: 'monthly' | 'annual',
+    pricePaid?: number
+  ): Promise<Subscription> {
     const current = await this.getSubscription(orgId);
+    const defaultExpiry = status === 'active' 
+      ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+      : (current?.expires_at || new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString());
+
+    const fieldsToSet = {
+      status,
+      plan_name: planName || current?.plan_name || 'اشتراك المغسلة السحابي',
+      expires_at: expiresAt || defaultExpiry,
+      billing_cycle: billingCycle || current?.billing_cycle || 'monthly',
+      price_paid: pricePaid !== undefined ? pricePaid : (current?.price_paid || 0)
+    };
+
     if (!current) {
       const { data, error } = await supabase
         .from('subscriptions')
         .insert({
           organization_id: orgId,
-          plan_name: planName || 'اشتراك المغسلة السحابي',
-          status,
-          expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+          ...fieldsToSet
         })
         .select()
         .single();
@@ -259,13 +278,7 @@ class LocalDatabase {
     } else {
       const { data, error } = await supabase
         .from('subscriptions')
-        .update({
-          status,
-          plan_name: planName || current.plan_name,
-          expires_at: status === 'active' 
-            ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
-            : current.expires_at
-        })
+        .update(fieldsToSet)
         .eq('organization_id', orgId)
         .select()
         .single();
@@ -528,6 +541,72 @@ class LocalDatabase {
       .eq('id', orgId);
 
     if (error) throw new Error(error.message);
+  }
+
+  // Pricing Settings helpers
+  async getPricingSettings(): Promise<{ [key: string]: number }> {
+    const { data, error } = await supabase
+      .from('pricing_settings')
+      .select('*');
+    if (error || !data) {
+      return {
+        monthly_price: 299,
+        monthly_original_price: 499,
+        annual_price: 3500,
+        annual_original_price: 4999
+      };
+    }
+    const settings: { [key: string]: number } = {};
+    data.forEach(item => {
+      settings[item.key] = Number(item.value);
+    });
+    return settings;
+  }
+
+  async updatePricingSetting(key: string, value: number): Promise<void> {
+    const { error } = await supabase
+      .from('pricing_settings')
+      .upsert({ key, value });
+    if (error) throw new Error(error.message);
+  }
+
+  // Promo Codes helpers
+  async getPromoCodes(): Promise<any[]> {
+    const { data, error } = await supabase
+      .from('promo_codes')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (error) return [];
+    return data || [];
+  }
+
+  async createPromoCode(code: string, type: 'trial' | 'discount_percent' | 'discount_amount', value: number): Promise<any> {
+    const { data, error } = await supabase
+      .from('promo_codes')
+      .insert({ code: code.toUpperCase().trim(), type, value })
+      .select()
+      .single();
+    if (error) throw new Error(error.message);
+    return data;
+  }
+
+  async deletePromoCode(id: string): Promise<void> {
+    const { error } = await supabase
+      .from('promo_codes')
+      .delete()
+      .eq('id', id);
+    if (error) throw new Error(error.message);
+  }
+
+  async verifyPromoCode(code: string): Promise<any> {
+    const { data, error } = await supabase
+      .from('promo_codes')
+      .select('*')
+      .eq('code', code.toUpperCase().trim())
+      .eq('is_active', true)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    return data;
   }
 }
 

@@ -58,10 +58,14 @@ export default function AdminLaundriesPage() {
   const [editAddress, setEditAddress] = useState('');
   const [editWhatsApp, setEditWhatsApp] = useState('');
 
+  // Add form fields
+  const [addTrialDays, setAddTrialDays] = useState('30');
+
   // Subscription management fields
   const [subStatus, setSubStatus] = useState<Subscription['status']>('active');
   const [subPlanName, setSubPlanName] = useState('اشتراك المغسلة السحابي');
   const [subExpiresAt, setSubExpiresAt] = useState('');
+  const [subBillingCycle, setSubBillingCycle] = useState<'monthly' | 'annual'>('monthly');
 
   // Loading/saving state
   const [actionLoading, setActionLoading] = useState(false);
@@ -134,6 +138,20 @@ export default function AdminLaundriesPage() {
         });
       }
 
+      // Update default subscription if custom trial / cycle is selected
+      if (addTrialDays !== '30') {
+        const expiryISO = new Date(Date.now() + Number(addTrialDays) * 24 * 60 * 60 * 1000).toISOString();
+        const planName = Number(addTrialDays) <= 14 ? 'اشتراك المغسلة السحابي (تجريبي)' : 'اشتراك المغسلة السحابي';
+        await supabase
+          .from('subscriptions')
+          .update({
+            plan_name: planName,
+            expires_at: expiryISO,
+            billing_cycle: Number(addTrialDays) === 365 ? 'annual' : 'monthly'
+          })
+          .eq('organization_id', newOrg.id);
+      }
+
       setSuccessMsg('تمت إضافة المغسلة وتفعيل اشتراكها بنجاح!');
       setIsAddOpen(false);
       
@@ -145,6 +163,7 @@ export default function AdminLaundriesPage() {
       setAddOwnerName('');
       setAddOwnerEmail('');
       setAddOwnerPassword('12345678');
+      setAddTrialDays('30');
       
       await loadData();
     } catch (err: any) {
@@ -195,10 +214,12 @@ export default function AdminLaundriesPage() {
       setSubStatus(sub.status);
       setSubPlanName(sub.plan_name);
       setSubExpiresAt(sub.expires_at ? sub.expires_at.split('T')[0] : '');
+      setSubBillingCycle(sub.billing_cycle || 'monthly');
     } else {
       setSubStatus('inactive');
       setSubPlanName('اشتراك المغسلة السحابي');
       setSubExpiresAt(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
+      setSubBillingCycle('monthly');
     }
     setIsSubOpen(true);
   };
@@ -216,7 +237,8 @@ export default function AdminLaundriesPage() {
         .update({
           status: subStatus,
           plan_name: subPlanName,
-          expires_at: expiryISO
+          expires_at: expiryISO,
+          billing_cycle: subBillingCycle
         })
         .eq('organization_id', selectedOrg.id);
 
@@ -534,6 +556,20 @@ export default function AdminLaundriesPage() {
                     />
                   </div>
                 </div>
+                
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-400">نوع الاشتراك / الفترة التجريبية *</label>
+                  <select
+                    value={addTrialDays}
+                    onChange={(e) => setAddTrialDays(e.target.value)}
+                    className="w-full text-xs text-slate-200 bg-dark-bg/85 border border-dark-border rounded-xl p-3 focus:outline-none focus:border-red-500/40"
+                  >
+                    <option value="7">فترة تجريبية - 7 أيام (بدون دفع)</option>
+                    <option value="14">فترة تجريبية - 14 يوماً (بدون دفع)</option>
+                    <option value="30">اشتراك مفعل - 30 يوماً</option>
+                    <option value="365">اشتراك مفعل - سنة كاملة (365 يوماً)</option>
+                  </select>
+                </div>
               </div>
 
               <div className="flex gap-3 pt-4 border-t border-dark-border font-sans">
@@ -668,6 +704,18 @@ export default function AdminLaundriesPage() {
                   onChange={(e) => setSubPlanName(e.target.value)}
                   className="w-full text-xs text-slate-200 bg-dark-bg/85 border border-dark-border rounded-xl p-3 focus:outline-none focus:border-red-500/40"
                 />
+              </div>
+
+              <div className="space-y-1 font-sans">
+                <label className="text-[10px] font-bold text-slate-400">دورة الفوترة</label>
+                <select
+                  value={subBillingCycle}
+                  onChange={(e) => setSubBillingCycle(e.target.value as any)}
+                  className="w-full text-xs text-slate-200 bg-dark-bg/85 border border-dark-border rounded-xl p-3 focus:outline-none focus:border-red-500/40"
+                >
+                  <option value="monthly">شهري (Monthly)</option>
+                  <option value="annual">سنوي (Annual)</option>
+                </select>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 font-sans">
