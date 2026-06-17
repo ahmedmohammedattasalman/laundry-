@@ -110,7 +110,7 @@ export default function DashboardLayout({
   return (
     <div className="min-h-screen flex bg-dark-bg text-slate-100 font-sans">
       {/* 1. Desktop Sidebar */}
-      <aside className="hidden lg:flex lg:flex-col lg:w-72 lg:fixed lg:inset-y-0 lg:start-0 bg-dark-card/60 backdrop-blur-xl border-e border-dark-border z-20 flex-shrink-0">
+      <aside className="no-print hidden lg:flex lg:flex-col lg:w-72 lg:fixed lg:inset-y-0 lg:start-0 bg-dark-card/60 backdrop-blur-xl border-e border-dark-border z-20 flex-shrink-0">
         
         {/* Organization Brand Header */}
         <div className="h-20 flex items-center px-6 border-b border-dark-border gap-3 bg-dark-card/20">
@@ -178,7 +178,7 @@ export default function DashboardLayout({
       <div className="flex-1 flex flex-col min-w-0 lg:ps-72">
         
         {/* Top Header Navigation */}
-        <header className="h-20 border-b border-dark-border bg-dark-bg/80 backdrop-blur-xl flex items-center justify-between px-6 md:px-8 sticky top-0 z-10">
+        <header className="no-print h-20 border-b border-dark-border bg-dark-bg/80 backdrop-blur-xl flex items-center justify-between px-6 md:px-8 sticky top-0 z-10">
           <div className="flex items-center gap-3">
             <button
               onClick={() => setMobileMenuOpen(true)}
@@ -214,7 +214,7 @@ export default function DashboardLayout({
 
       {/* 3. Mobile Sidebar Overlay */}
       {mobileMenuOpen && (
-        <div className="fixed inset-0 z-30 lg:hidden flex">
+        <div className="no-print fixed inset-0 z-30 lg:hidden flex">
           
           {/* Backdrop */}
           <div 

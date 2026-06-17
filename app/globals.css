@@ -216,27 +216,62 @@ h1, h2, h3, h4, h5, h6 {
 
 /* Print Specific Rules */
 @media print {
+  /* Reset html, body background and height to collapse empty pages */
+  html, body {
+    background: white !important;
+    background-color: white !important;
+    color: black !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+  }
+
+  /* Hide the rest of the application layout */
+  .no-print {
+    display: none !important;
+  }
+
+  /* Hide all elements by default (visibility-based fallback) */
   body * {
     visibility: hidden;
   }
   
-  #printable-receipt-area, #printable-receipt-area * {
-    visibility: visible;
+  /* Make the printable receipt and its children visible */
+  #printable-receipt-area, 
+  #printable-receipt-area * {
+    visibility: visible !important;
   }
   
+  /* Style the printable receipt for output */
   #printable-receipt-area {
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 100% !important;
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
     background-color: white !important;
     color: black !important;
-    padding: 0 !important;
+    padding: 8px !important;
     margin: 0 !important;
     box-shadow: none !important;
+    border: none !important;
+  }
+
+  /* Ensure selected paper sizes are preserved during print */
+  .thermal-receipt-58 {
+    width: 58mm !important;
+    max-width: 58mm !important;
+    font-size: 10px !important;
+  }
+  
+  .thermal-receipt-80 {
+    width: 80mm !important;
+    max-width: 80mm !important;
+    font-size: 12px !important;
   }
 
   @page {
     margin: 0;
+    size: auto;
   }
 }

@@ -171,7 +171,7 @@ export default function NewOrderPage() {
     <div className="space-y-8 animate-fade-in text-right">
       
       {success && createdInvoice && createdCustomer && (
-        <div className="bg-dark-card/90 border border-green-500/30 p-6 rounded-3xl flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-premium relative overflow-hidden">
+        <div className="no-print bg-dark-card/90 border border-green-500/30 p-6 rounded-3xl flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-premium relative overflow-hidden">
           <div className="absolute top-0 start-0 w-24 h-24 rounded-full bg-green-500/5 blur-[30px] pointer-events-none" />
           <div className="relative z-10">
             <div className="flex items-center gap-2 text-green-400 font-bold text-sm">
@@ -212,7 +212,7 @@ export default function NewOrderPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
         
         {/* Left Card: Order Entry Form */}
-        <div className="premium-card rounded-3xl p-8 shadow-float text-right">
+        <div className="no-print premium-card rounded-3xl p-8 shadow-float text-right">
           <h2 className="text-lg font-bold text-white mb-6 flex items-center gap-2 font-heading">
             <Plus className="w-5 h-5 text-brand-400" />
             منشئ الفواتير السريع
@@ -421,7 +421,7 @@ export default function NewOrderPage() {
 
         {/* Right Card: Live Receipt Preview */}
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="no-print flex items-center justify-between">
             <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest">المعاينة المباشرة للإيصال</h3>
             <div className="flex bg-dark-card p-0.5 rounded-xl border border-dark-border">
               <button

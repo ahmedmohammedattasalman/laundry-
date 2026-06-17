@@ -167,7 +167,7 @@ export default function InvoicesPage() {
     <div className="space-y-6 animate-fade-in relative text-right">
       
       {/* 1. Filtering & Search Header */}
-      <div className="flex flex-col md:flex-row gap-4 items-center justify-between bg-dark-card/40 p-5 rounded-3xl border border-dark-border shadow-premium">
+      <div className="no-print flex flex-col md:flex-row gap-4 items-center justify-between bg-dark-card/40 p-5 rounded-3xl border border-dark-border shadow-premium">
         
         {/* Search */}
         <div className="relative w-full md:max-w-xs">
@@ -202,7 +202,7 @@ export default function InvoicesPage() {
       </div>
 
       {/* 2. Invoices List Table */}
-      <div className="premium-card rounded-3xl p-6 overflow-hidden">
+      <div className="no-print premium-card rounded-3xl p-6 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full border-collapse text-right">
             <thead>
@@ -276,7 +276,7 @@ export default function InvoicesPage() {
           <div className="fixed inset-0 z-45 flex justify-end">
             {/* Backdrop */}
             <div 
-              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+              className="no-print absolute inset-0 bg-black/60 backdrop-blur-sm"
               onClick={() => setSelectedInvoice(null)}
             />
 
@@ -284,7 +284,7 @@ export default function InvoicesPage() {
             <div className="relative w-full max-w-xl bg-dark-card border-s border-dark-border h-full flex flex-col justify-between shadow-2xl z-50 animate-slide-in">
               
               {/* Header */}
-              <div className="p-6 border-b border-dark-border flex justify-between items-center bg-dark-card/25 backdrop-blur-md">
+              <div className="no-print p-6 border-b border-dark-border flex justify-between items-center bg-dark-card/25 backdrop-blur-md">
                 <div>
                   <h3 className="text-lg font-bold text-white font-heading">تفاصيل الفاتورة</h3>
                   <p className="text-xs text-slate-500 mt-0.5 font-mono">الرقم المرجعي: {selectedInvoice.id}</p>
@@ -301,7 +301,7 @@ export default function InvoicesPage() {
               <div className="flex-1 p-6 overflow-y-auto space-y-6">
                 
                 {/* Status Modifier Box */}
-                <div className="bg-dark-bg/60 border border-dark-border p-5 rounded-3xl space-y-3">
+                <div className="no-print bg-dark-bg/60 border border-dark-border p-5 rounded-3xl space-y-3">
                   <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">تحديث حالة الطلب</span>
                   <div className="grid grid-cols-4 gap-2">
                     {(['received', 'processing', 'completed', 'delivered'] as const).map((status) => (
@@ -321,7 +321,7 @@ export default function InvoicesPage() {
                 </div>
 
                 {/* Print Layout Toggle */}
-                <div className="flex justify-between items-center">
+                <div className="no-print flex justify-between items-center">
                   <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">معاينة الإيصال الحراري</h4>
                   <div className="flex bg-dark-bg p-0.5 rounded-xl border border-dark-border">
                     <button
@@ -459,7 +459,7 @@ export default function InvoicesPage() {
               </div>
 
               {/* Drawer Footer Actions */}
-              <div className="p-6 border-t border-dark-border bg-dark-card flex gap-4 shrink-0">
+              <div className="no-print p-6 border-t border-dark-border bg-dark-card flex gap-4 shrink-0">
                 <button
                   onClick={triggerPrint}
                   className="flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-2xl text-xs font-bold text-white premium-btn-primary transition-all cursor-pointer shadow-md"
