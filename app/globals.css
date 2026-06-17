@@ -216,7 +216,7 @@ h1, h2, h3, h4, h5, h6 {
 
 /* Print Specific Rules */
 @media print {
-  /* Reset html, body background and height to collapse empty pages */
+  /* Reset html, body */
   html, body {
     background: white !important;
     background-color: white !important;
@@ -228,49 +228,111 @@ h1, h2, h3, h4, h5, h6 {
     overflow: visible !important;
   }
 
-  /* Hide the rest of the application layout */
+  /* Hide all non-printable UI elements */
   .no-print {
     display: none !important;
   }
 
-  /* Hide all elements by default (visibility-based fallback) */
+  /* Hide everything by default */
   body * {
     visibility: hidden;
   }
   
-  /* Make the printable receipt and its children visible */
+  /* Show only the receipt */
   #printable-receipt-area, 
   #printable-receipt-area * {
     visibility: visible !important;
   }
   
-  /* Style the printable receipt for output */
+  /* Position and center the receipt on the printed page */
   #printable-receipt-area {
-    position: absolute !important;
-    left: 0 !important;
-    right: 0 !important;
+    position: fixed !important;
     top: 0 !important;
-    width: 100% !important;
-    max-width: 140mm !important;
+    left: 50% !important;
+    transform: translateX(-50%) !important;
+    width: 180mm !important;
+    max-width: 95vw !important;
     background-color: white !important;
     color: black !important;
-    padding: 24px !important;
-    margin: 0 auto !important;
+    padding: 15mm 12mm !important;
+    margin: 0 !important;
     box-shadow: none !important;
     border: none !important;
+    font-size: 14px !important;
   }
 
-  /* Ensure selected paper sizes are preserved during print */
-  .thermal-receipt-58 {
-    font-size: 11px !important;
+  /* Override thermal receipt base styles for print */
+  #printable-receipt-area.thermal-receipt {
+    width: 180mm !important;
+    font-family: 'IBM Plex Sans Arabic', 'Segoe UI', Tahoma, sans-serif !important;
+    font-size: 14px !important;
   }
-  
-  .thermal-receipt-80 {
+
+  /* Scale up header text */
+  #printable-receipt-area h2 {
+    font-size: 22px !important;
+    margin-bottom: 4px !important;
+  }
+
+  /* Scale up all small text inside receipt */
+  #printable-receipt-area .text-\[10px\],
+  #printable-receipt-area .text-\[9px\],
+  #printable-receipt-area .text-\[8px\],
+  #printable-receipt-area .text-\[7px\],
+  #printable-receipt-area .text-\[6px\] {
     font-size: 13px !important;
   }
 
+  /* Scale up the total line */
+  #printable-receipt-area .text-xs.font-black {
+    font-size: 16px !important;
+  }
+
+  /* Fix the "triangle" look: tighten flex rows so labels and values don't spread apart */
+  #printable-receipt-area .flex.justify-between {
+    justify-content: flex-start !important;
+    gap: 12px !important;
+  }
+
+  /* Push the value (second child) to the left side using auto-margin */
+  #printable-receipt-area .flex.justify-between > span:last-child,
+  #printable-receipt-area .flex.justify-between > span:nth-child(3) {
+    margin-inline-start: auto !important;
+  }
+
+  /* Widen the dashed borders */
+  #printable-receipt-area .border-t,
+  #printable-receipt-area .border-b {
+    border-color: #999 !important;
+  }
+
+  /* Make QR code and logo bigger for full page */
+  #printable-receipt-area img {
+    height: 60px !important;
+    width: 60px !important;
+  }
+
+  #printable-receipt-area svg {
+    width: 140px !important;
+    height: 140px !important;
+  }
+
+  /* Add spacing between sections */
+  #printable-receipt-area > div {
+    margin-bottom: 8px !important;
+  }
+
+  /* Ignore thermal width classes in print */
+  .thermal-receipt-58,
+  .thermal-receipt-80 {
+    width: 180mm !important;
+    max-width: 95vw !important;
+    font-size: 14px !important;
+  }
+
   @page {
-    margin: 0;
+    margin: 5mm;
     size: auto;
   }
 }
+
