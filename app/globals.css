@@ -1,0 +1,242 @@
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700;800&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: 'IBM Plex Sans Arabic', 'Inter', sans-serif;
+  --font-heading: 'IBM Plex Sans Arabic', 'Inter', sans-serif;
+  
+  --color-brand-50: #f4f6fe;
+  --color-brand-100: #e9ecfd;
+  --color-brand-200: #d7dbfc;
+  --color-brand-300: #b9befa;
+  --color-brand-400: #969af6;
+  --color-brand-500: #7172ef;
+  --color-brand-600: #5552e5;
+  --color-brand-700: #4640ce;
+  --color-brand-800: #3a35a9;
+  --color-brand-900: #332f87;
+  --color-brand-950: #1e1c53;
+
+  --color-dark-bg: #050507;
+  --color-dark-card: #0d0d12;
+  --color-dark-border: #161622;
+
+  --shadow-glass: 0 8px 32px 0 rgba(113, 114, 239, 0.03);
+  --shadow-premium: 0 20px 40px -15px rgba(0, 0, 0, 0.3);
+  --shadow-float: 0 30px 60px -15px rgba(113, 114, 239, 0.08);
+}
+
+:root {
+  --background: #050507;
+  --foreground: #f8fafc;
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  min-height: 100vh;
+  overflow-x: hidden;
+  position: relative;
+}
+
+/* Premium Ambient Dot Grid Background */
+body::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: -10;
+  pointer-events: none;
+  background-image: radial-gradient(rgba(113, 114, 239, 0.08) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-heading);
+  letter-spacing: -0.02em;
+}
+
+/* Premium Card & Panels styling */
+.premium-card {
+  background: linear-gradient(135deg, rgba(13, 13, 18, 0.8) 0%, rgba(8, 8, 12, 0.9) 100%);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(113, 114, 239, 0.08);
+  box-shadow: var(--shadow-premium), var(--shadow-glass);
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.premium-card:hover {
+  border-color: rgba(113, 114, 239, 0.2);
+  box-shadow: var(--shadow-float);
+  transform: translateY(-2px);
+}
+
+/* Input Fields styling */
+.premium-input {
+  background: rgba(8, 8, 12, 0.6);
+  border: 1px solid rgba(113, 114, 239, 0.12);
+  border-radius: 14px;
+  color: #f8fafc;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.premium-input:focus {
+  background: rgba(13, 13, 18, 0.9);
+  border-color: rgba(113, 114, 239, 0.6);
+  box-shadow: 0 0 0 3px rgba(113, 114, 239, 0.15);
+  outline: none;
+}
+
+/* Premium Interactive Button */
+.premium-btn-primary {
+  background: linear-gradient(135deg, #7172ef 0%, #5552e5 100%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: white;
+  box-shadow: 0 4px 20px -5px rgba(113, 114, 239, 0.4);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.premium-btn-primary::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to right, transparent, rgba(255, 255, 255, 0.15), transparent);
+  transform: translateX(-100%);
+  transition: transform 0.6s ease;
+}
+
+.premium-btn-primary:hover::after {
+  transform: translateX(100%);
+}
+
+.premium-btn-primary:hover {
+  transform: translateY(-1.5px);
+  box-shadow: 0 8px 25px -5px rgba(113, 114, 239, 0.55);
+}
+
+.premium-btn-primary:active {
+  transform: translateY(0);
+}
+
+/* Premium Secondary Button */
+.premium-btn-secondary {
+  background: rgba(13, 13, 18, 0.6);
+  border: 1px solid rgba(113, 114, 239, 0.15);
+  color: #cbd5e1;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.premium-btn-secondary:hover {
+  background: rgba(22, 22, 34, 0.8);
+  border-color: rgba(113, 114, 239, 0.45);
+  color: white;
+  transform: translateY(-1px);
+}
+
+/* Sidebar Navigation Link Active state */
+.premium-nav-item {
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.premium-nav-item-active {
+  background: linear-gradient(90deg, rgba(113, 114, 239, 0.15) 0%, rgba(113, 114, 239, 0.02) 100%);
+  border-right: 3px solid #7172ef;
+  color: #ffffff;
+}
+
+/* Glassmorphism Classes */
+.glass-panel {
+  background: rgba(13, 13, 18, 0.6);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(113, 114, 239, 0.06);
+  box-shadow: var(--shadow-premium), var(--shadow-glass);
+}
+
+.dark .glass-panel {
+  background: rgba(13, 13, 18, 0.6);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(113, 114, 239, 0.06);
+  box-shadow: var(--shadow-premium), var(--shadow-glass);
+}
+
+.glass-button {
+  background: rgba(113, 114, 239, 0.08);
+  border: 1px solid rgba(113, 114, 239, 0.15);
+  backdrop-filter: blur(8px);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.glass-button:hover {
+  background: rgba(113, 114, 239, 0.18);
+  border: 1px solid rgba(113, 114, 239, 0.35);
+  transform: translateY(-1px);
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(113, 114, 239, 0.15);
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(113, 114, 239, 0.35);
+}
+
+/* Thermal Printer Receipt Styles */
+.thermal-receipt {
+  background-color: white;
+  color: black;
+  font-family: 'IBM Plex Sans Arabic', 'Courier New', Courier, monospace;
+  padding: 10px;
+  box-sizing: border-box;
+}
+
+.thermal-receipt-58 {
+  width: 58mm;
+  font-size: 10px;
+}
+
+.thermal-receipt-80 {
+  width: 80mm;
+  font-size: 12px;
+}
+
+/* Print Specific Rules */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  
+  #printable-receipt-area, #printable-receipt-area * {
+    visibility: visible;
+  }
+  
+  #printable-receipt-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100% !important;
+    background-color: white !important;
+    color: black !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+  }
+
+  @page {
+    margin: 0;
+  }
+}
