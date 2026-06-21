@@ -331,15 +331,6 @@ export default function NewOrderPage() {
               <Printer className="w-4 h-4" />
               طباعة إيصال حراري
             </button>
-            <a
-              href={getWhatsAppLink()}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center justify-center gap-2 px-5 py-3 rounded-2xl text-xs font-bold text-slate-300 hover:text-white premium-btn-secondary border border-dark-border cursor-pointer transition-all"
-            >
-              <Share2 className="w-4 h-4 text-brand-400" />
-              إرسال تنبيه واتساب
-            </a>
             <button
               onClick={() => setSuccess(false)}
               className="flex items-center justify-center gap-2 px-5 py-3 rounded-2xl text-xs font-bold text-slate-400 hover:text-slate-200 bg-slate-950 border border-dark-border cursor-pointer transition-all"
@@ -427,7 +418,7 @@ export default function NewOrderPage() {
                     }
                   }}
                   className="block w-full ps-11 pe-3.5 py-3.5 text-sm premium-input text-right"
-                  placeholder="مثال: سارة الغامدي"
+                  placeholder="مثال: محمد عثمان"
                 />
               </div>
               {(customerBundle || activeCustomer) && (

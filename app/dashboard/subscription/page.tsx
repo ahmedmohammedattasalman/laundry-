@@ -347,13 +347,18 @@ export default function SubscriptionSettingsPage() {
 
           <button
             onClick={handleRenew}
-            disabled={isRenewing}
+            disabled={isRenewing || subscription?.status === 'active'}
             className="w-full mt-6 flex items-center justify-center gap-2 py-3.5 px-4 rounded-2xl text-xs font-bold text-white premium-btn-primary shadow-md cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isRenewing ? (
               <>
                 <RefreshCw className="w-4 h-4 animate-spin" />
                 جاري تهيئة الدفع…
+              </>
+            ) : subscription?.status === 'active' ? (
+              <>
+                <Check className="w-4 h-4 text-green-400 animate-pulse" />
+                الاشتراك نشط حالياً
               </>
             ) : (
               <>
