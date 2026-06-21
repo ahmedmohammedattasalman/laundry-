@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { db, Customer, Invoice, Organization } from '@/lib/db';
+import { db, Customer, Invoice, Organization, ServiceType, StaffMember, Bundle, UserSession } from '@/lib/db';
 import { generateZatcaString } from '@/lib/zatca';
 import { 
   User, 
@@ -14,7 +14,9 @@ import {
   Check, 
   Printer, 
   Share2, 
-  Plus
+  Plus,
+  Wallet,
+  AlertTriangle
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 
@@ -22,17 +24,21 @@ export default function NewOrderPage() {
   // Database refs
   const [organization, setOrganization] = useState<Organization | null>(null);
   const [customers, setCustomers] = useState<Customer[]>([]);
-  const [session, setSession] = useState<any>(null);
+  const [session, setSession] = useState<UserSession | null>(null);
 
   // Form states
   const [phone, setPhone] = useState('');
   const [name, setName] = useState('');
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
-  const [serviceType, setServiceType] = useState('تنظيف جاف');
+  const [customerBundle, setCustomerBundle] = useState<Bundle | null>(null);
+  const [createdBy, setCreatedBy] = useState('');
+  const [staffMembers, setStaffMembers] = useState<StaffMember[]>([]);
+  const [serviceType, setServiceType] = useState('');
+  const [serviceTypes, setServiceTypes] = useState<ServiceType[]>([]);
   const [piecesCount, setPiecesCount] = useState(1);
   const [amount, setAmount] = useState(10); // Base amount before VAT
   const [notes, setNotes] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'package_subscriber'>('cash');
+  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'package_subscriber' | 'points_redemption'>('cash');
   const [paperSize, setPaperSize] = useState<'58' | '80'>('80');
 
   // Operational states
@@ -40,6 +46,7 @@ export default function NewOrderPage() {
   const [createdCustomer, setCreatedCustomer] = useState<Customer | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [error, setError] = useState('');
   
   // Autosuggest states
   const [suggestions, setSuggestions] = useState<Customer[]>([]);
@@ -52,35 +59,88 @@ export default function NewOrderPage() {
         const orgId = activeSession.organization_id;
         const org = await db.getOrganization(orgId);
         const custs = await db.getCustomers(orgId);
+        const services = await db.getServiceTypes(orgId);
+        const staff = await db.getStaffMembers(orgId);
         setOrganization(org);
         setCustomers(custs);
+        setServiceTypes(services);
+        setStaffMembers(staff);
+        if (services.length > 0) {
+          setServiceType(services[0].name);
+        }
+        if (staff.length > 0) {
+          setCreatedBy(staff[0].name);
+        }
       }
     };
     loadData();
   }, [success]);
 
+  // Reset points redemption if selected service required points are higher than customer's points
+  useEffect(() => {
+    if (paymentMethod === 'points_redemption') {
+      const selected = serviceTypes.find(st => st.name === serviceType);
+      const required = selected?.points_to_redeem ?? 0;
+      const activeCust = customers.find(c => c.id === selectedCustomerId);
+      
+      if (!activeCust || required <= 0 || activeCust.points < required) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        setPaymentMethod('cash');
+      }
+    }
+  }, [serviceType, selectedCustomerId, paymentMethod, serviceTypes, customers]);
+
   // Handle phone changes to trigger auto-suggest
-  const handlePhoneChange = (val: string) => {
+  const handlePhoneChange = async (val: string) => {
     setPhone(val);
+    setSelectedCustomerId(null);
+    setCustomerBundle(null);
+    setPaymentMethod('cash');
     if (val.length >= 3) {
       const filtered = customers.filter(c => c.phone.includes(val));
       setSuggestions(filtered);
+
+      // If exact phone match exists, pre-select it
+      const exactMatch = customers.find(c => c.phone === val);
+      if (exactMatch) {
+        setSelectedCustomerId(exactMatch.id);
+        setName(exactMatch.name);
+        setSuggestions([]);
+        try {
+          const bundle = await db.getCustomerBundle(exactMatch.id);
+          setCustomerBundle(bundle);
+        } catch (e) {
+          console.error(e);
+        }
+      }
     } else {
       setSuggestions([]);
     }
   };
 
   // Select customer from suggestions
-  const selectCustomer = (cust: Customer) => {
+  const selectCustomer = async (cust: Customer) => {
     setName(cust.name);
     setPhone(cust.phone);
     setSelectedCustomerId(cust.id);
     setSuggestions([]);
+    try {
+      const bundle = await db.getCustomerBundle(cust.id);
+      setCustomerBundle(bundle);
+    } catch (err) {
+      console.error(err);
+      setCustomerBundle(null);
+    }
   };
 
   // Calculations
-  const vatAmount = amount * 0.15;
-  const totalAmount = amount + vatAmount;
+  const activeCustomer = customers.find(c => c.id === selectedCustomerId);
+  const selectedService = serviceTypes.find(st => st.name === serviceType);
+  const requiredPointsForFree = selectedService?.points_to_redeem ?? 0;
+  const isRedeemingPoints = paymentMethod === 'points_redemption';
+  const currentBaseAmount = isRedeemingPoints ? 0 : amount;
+  const vatAmount = currentBaseAmount * 0.15;
+  const totalAmount = currentBaseAmount + vatAmount;
 
   // Submit Handler
   const handleCreateOrder = async (e: React.FormEvent) => {
@@ -88,12 +148,68 @@ export default function NewOrderPage() {
     if (!session?.organization_id) return;
     setIsSubmitting(true);
     setSuccess(false);
+    setError('');
 
     try {
       const orgId = session.organization_id;
       let customerId = selectedCustomerId;
 
-      // 1. Create customer if not existing
+      // 1. If subscriber package is selected, validate first before anything else
+      if (paymentMethod === 'package_subscriber') {
+        if (!customerId) {
+          const existingCust = customers.find(c => c.phone === phone);
+          if (existingCust) {
+            customerId = existingCust.id;
+          } else {
+            setError('يجب اختيار عميل مسجل لديه باقة مشترك نشطة للدفع عن طريق الباقة.');
+            setIsSubmitting(false);
+            return;
+          }
+        }
+
+        const bundle = await db.getCustomerBundle(customerId);
+        if (!bundle) {
+          setError('لا توجد باقة مفعلة لهذا العميل. يرجى تفعيل باقة وشحنها أولاً.');
+          setIsSubmitting(false);
+          return;
+        }
+
+        if (Number(bundle.balance) < Number(totalAmount)) {
+          setError(`رصيد الباقة غير كافٍ. الرصيد الحالي: ${Number(bundle.balance).toFixed(2)} ر.س، والمبلغ المطلوب: ${Number(totalAmount).toFixed(2)} ر.س.`);
+          setIsSubmitting(false);
+          return;
+        }
+
+        // Deduct balance
+        await db.deductBundleBalance(customerId, totalAmount);
+        
+        // Refresh customer bundle state
+        const updatedBundle = await db.getCustomerBundle(customerId);
+        setCustomerBundle(updatedBundle);
+      }
+
+      // 2. If points redemption is selected, validate points balance
+      if (paymentMethod === 'points_redemption') {
+        if (!customerId) {
+          setError('يجب اختيار عميل مسجل ولديه نقاط كافية لطلب مجاني.');
+          setIsSubmitting(false);
+          return;
+        }
+        const activeCust = customers.find(c => c.id === customerId);
+        const requiredPoints = requiredPointsForFree;
+        if (requiredPoints <= 0) {
+          setError('هذه الخدمة غير قابلة للاستبدال بالنقاط.');
+          setIsSubmitting(false);
+          return;
+        }
+        if (!activeCust || activeCust.points < requiredPoints) {
+          setError(`نقاط العميل غير كافية لطلب مجاني. النقاط المطلوبة: ${requiredPoints} نقطة.`);
+          setIsSubmitting(false);
+          return;
+        }
+      }
+
+      // 3. Create customer if not existing
       if (!customerId) {
         const newCust = await db.createCustomer(orgId, name, phone);
         customerId = newCust.id;
@@ -103,32 +219,45 @@ export default function NewOrderPage() {
         if (existingCust) setCreatedCustomer(existingCust);
       }
 
-      // 2. Create invoice record
+      // 4. Create invoice record
       const invoice = await db.createInvoice(orgId, {
         customer_id: customerId!,
         service_type: serviceType,
         pieces_count: Number(piecesCount),
-        amount: Number(amount),
+        amount: Number(currentBaseAmount),
         vat_amount: Number(vatAmount),
         total_amount: Number(totalAmount),
         notes: notes || undefined,
         status: 'received',
-        payment_method: paymentMethod
+        payment_method: paymentMethod,
+        created_by: createdBy.trim() || undefined
       });
 
       setCreatedInvoice(invoice);
       setSuccess(true);
 
+      // Trigger automatic WhatsApp message sending in the background
+      fetch('/api/whatsapp/send-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          invoiceId: invoice.id,
+          event: 'created'
+        })
+      }).catch(err => console.error('Failed to send automatic WhatsApp notification:', err));
+
       // Reset form
       setPhone('');
       setName('');
       setSelectedCustomerId(null);
+      setCustomerBundle(null);
       setPiecesCount(1);
       setAmount(10);
       setNotes('');
       setPaymentMethod('cash');
-    } catch (err) {
+    } catch (err: any) { // eslint-disable-line @typescript-eslint/no-explicit-any
       console.error(err);
+      setError(err?.message || 'حدث خطأ أثناء حفظ الفاتورة.');
     } finally {
       setIsSubmitting(false);
     }
@@ -149,11 +278,16 @@ export default function NewOrderPage() {
   // WhatsApp Alert Generator
   const getWhatsAppLink = () => {
     if (!organization || !createdInvoice || !createdCustomer) return '#';
+    const paymentMethodText = 
+      createdInvoice.payment_method === 'cash' ? 'نقدي' :
+      createdInvoice.payment_method === 'package_subscriber' ? 'باقة المشترك' : 'استبدال نقاط (مجاني)';
+
     const message = `نشكركم على اختياركم ${organization.name}\n\n` +
       `رقم الفاتورة: ${createdInvoice.invoice_number}\n` +
       `نوع الخدمة: ${createdInvoice.service_type}\n` +
       `عدد القطع: ${createdInvoice.pieces_count}\n` +
-      `المبلغ الإجمالي: ${Number(createdInvoice.total_amount).toFixed(2)} ر.س (شامل ضريبة القيمة المضافة ١٥٪)\n` +
+      `المبلغ الإجمالي: ${Number(createdInvoice.total_amount).toFixed(2)} ر.س (${paymentMethodText})\n` +
+      (createdInvoice.created_by ? `المستلم: ${createdInvoice.created_by}\n` : '') +
       `حالة الطلب: تم الاستلام 📥\n\n` +
       `سنقوم بإشعاركم فور جاهزية الملابس للاستلام.`;
     
@@ -170,6 +304,13 @@ export default function NewOrderPage() {
   return (
     <div className="space-y-8 animate-fade-in text-right">
       
+      {error && (
+        <div className="no-print bg-dark-card/90 border border-red-500/30 p-4.5 rounded-2xl flex items-center gap-3 shadow-premium text-red-400 text-xs font-semibold animate-pulse">
+          <AlertTriangle className="w-5 h-5 shrink-0" />
+          {error}
+        </div>
+      )}
+
       {success && createdInvoice && createdCustomer && (
         <div className="no-print bg-dark-card/90 border border-green-500/30 p-6 rounded-3xl flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-premium relative overflow-hidden">
           <div className="absolute top-0 start-0 w-24 h-24 rounded-full bg-green-500/5 blur-[30px] pointer-events-none" />
@@ -281,11 +422,65 @@ export default function NewOrderPage() {
                     setName(e.target.value);
                     if (selectedCustomerId) {
                       setSelectedCustomerId(null);
+                      setCustomerBundle(null);
+                      setPaymentMethod('cash');
                     }
                   }}
                   className="block w-full ps-11 pe-3.5 py-3.5 text-sm premium-input text-right"
                   placeholder="مثال: سارة الغامدي"
                 />
+              </div>
+              {(customerBundle || activeCustomer) && (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {activeCustomer && (
+                    <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-450 bg-amber-550/10 border border-amber-550/20 px-3 py-1.5 rounded-xl">
+                      <BadgeCent className="w-4 h-4 shrink-0 text-amber-400" />
+                      <span className="text-amber-400">النقاط الحالية للعميل: {activeCustomer.points} نقطة</span>
+                    </div>
+                  )}
+                  {customerBundle && (
+                    <div className="flex items-center gap-1.5 text-xs font-semibold text-purple-400 bg-purple-500/10 border border-purple-500/20 px-3 py-1.5 rounded-xl">
+                      <Wallet className="w-4 h-4 shrink-0" />
+                      <span>رصيد باقة المشترك الحالي: {Number(customerBundle.balance).toFixed(2)} ر.س</span>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Receiving Staff Name */}
+            <div className="space-y-1">
+              <label htmlFor="created-by" className="text-xs font-semibold text-slate-300">
+                الموظف المستلم
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 start-0 ps-3.5 flex items-center pointer-events-none text-slate-500">
+                  <User className="h-4 w-4" />
+                </div>
+                {staffMembers.length > 0 ? (
+                  <select
+                    id="created-by"
+                    value={createdBy}
+                    onChange={(e) => setCreatedBy(e.target.value)}
+                    className="block w-full ps-11 pe-3.5 py-3.5 text-sm premium-input appearance-none cursor-pointer text-right"
+                  >
+                    {staffMembers.map((sm) => (
+                      <option key={sm.id} value={sm.name}>
+                        {sm.name}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    id="created-by"
+                    type="text"
+                    required
+                    value={createdBy}
+                    onChange={(e) => setCreatedBy(e.target.value)}
+                    placeholder="اسم موظف الاستقبال"
+                    className="block w-full ps-11 pe-3.5 py-3.5 text-sm premium-input text-right"
+                  />
+                )}
               </div>
             </div>
 
@@ -299,18 +494,24 @@ export default function NewOrderPage() {
                   <div className="absolute inset-y-0 start-0 ps-3.5 flex items-center pointer-events-none text-slate-500">
                     <Layers className="h-4 w-4" />
                   </div>
-                  <select
-                    id="service-type"
-                    value={serviceType}
-                    onChange={(e) => setServiceType(e.target.value)}
-                    className="block w-full ps-11 pe-3.5 py-3.5 text-sm premium-input appearance-none cursor-pointer text-right"
-                  >
-                    <option value="تنظيف جاف">تنظيف جاف</option>
-                    <option value="غسيل وكي">غسيل وكي</option>
-                    <option value="كي فقط">كي فقط</option>
-                    <option value="إزالة البقع">إزالة البقع</option>
-                    <option value="بطانيات وألحفة">بطانيات وألحفة</option>
-                  </select>
+                  {serviceTypes.length > 0 ? (
+                    <select
+                      id="service-type"
+                      value={serviceType}
+                      onChange={(e) => setServiceType(e.target.value)}
+                      className="block w-full ps-11 pe-3.5 py-3.5 text-sm premium-input appearance-none cursor-pointer text-right"
+                    >
+                      {serviceTypes.map((st) => (
+                        <option key={st.id} value={st.name}>
+                          {st.name}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <div className="block w-full ps-3 pe-3.5 py-3.5 text-xs bg-red-500/10 border border-red-500/20 text-red-400 rounded-2xl text-right">
+                      يرجى إضافة أنواع الخدمات أولاً من شاشة الإعدادات
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -347,12 +548,13 @@ export default function NewOrderPage() {
                 <input
                   id="base-amount"
                   type="number"
-                  required
+                  required={!isRedeemingPoints}
                   min={0.1}
                   step={0.01}
-                  value={amount}
+                  disabled={isRedeemingPoints}
+                  value={isRedeemingPoints ? 0 : amount}
                   onChange={(e) => setAmount(Math.max(0.1, Number(e.target.value)))}
-                  className="block w-full ps-11 pe-3.5 py-3.5 text-sm premium-input font-mono text-right"
+                  className="block w-full ps-11 pe-3.5 py-3.5 text-sm premium-input font-mono text-right disabled:opacity-50"
                 />
               </div>
             </div>
@@ -379,12 +581,12 @@ export default function NewOrderPage() {
 
             {/* Payment Method / Account Type */}
             <div className="space-y-1.5 text-right">
-              <label className="text-xs font-semibold text-slate-300">طريقة الدفع</label>
-              <div className="grid grid-cols-2 gap-4">
+              <label className="text-xs font-semibold text-slate-350">طريقة الدفع</label>
+              <div className="grid grid-cols-3 gap-3">
                 <button
                   type="button"
                   onClick={() => setPaymentMethod('cash')}
-                  className={`py-3.5 px-4 border rounded-2xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                  className={`py-3 px-2 border rounded-2xl text-[10px] font-bold transition-all flex flex-col items-center justify-center gap-1 cursor-pointer ${
                     paymentMethod === 'cash'
                       ? 'bg-slate-900 text-white border-brand-500 shadow-float'
                       : 'border-dark-border text-slate-400 hover:text-slate-200 hover:bg-slate-900/20'
@@ -396,22 +598,75 @@ export default function NewOrderPage() {
                 <button
                   type="button"
                   onClick={() => setPaymentMethod('package_subscriber')}
-                  className={`py-3.5 px-4 border rounded-2xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                  className={`py-3 px-2 border rounded-2xl text-[10px] font-bold transition-all flex flex-col items-center justify-center gap-1 cursor-pointer ${
                     paymentMethod === 'package_subscriber'
                       ? 'bg-slate-900 text-white border-brand-500 shadow-float'
                       : 'border-dark-border text-slate-400 hover:text-slate-200 hover:bg-slate-900/20'
                   }`}
                 >
-                  <Plus className="w-4 h-4 text-purple-400" />
+                  <Wallet className="w-4 h-4 text-purple-400" />
                   باقة المشترك
                 </button>
+                <button
+                  type="button"
+                  disabled={!activeCustomer || requiredPointsForFree <= 0 || activeCustomer.points < requiredPointsForFree}
+                  onClick={() => setPaymentMethod('points_redemption')}
+                  className={`py-3 px-2 border rounded-2xl text-[10px] font-bold transition-all flex flex-col items-center justify-center gap-1 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer ${
+                    paymentMethod === 'points_redemption'
+                      ? 'bg-slate-900 text-white border-brand-500 shadow-float'
+                      : 'border-dark-border text-slate-400 hover:text-slate-200 hover:bg-slate-900/20'
+                  }`}
+                  title={
+                    !activeCustomer ? 'يرجى اختيار عميل أولاً' :
+                    requiredPointsForFree <= 0 ? 'هذه الخدمة غير قابلة للاستبدال بالنقاط' :
+                    activeCustomer.points < requiredPointsForFree ? `رصيد النقاط غير كافٍ (المطلوب: ${requiredPointsForFree} نقطة)` : 'طلب مجاني بالنقاط'
+                  }
+                >
+                  <BadgeCent className="w-4 h-4 text-amber-400" />
+                  طلب مجاني بالنقاط
+                </button>
               </div>
+              {paymentMethod === 'package_subscriber' && (
+                <div className="mt-2 text-right font-medium">
+                  {!selectedCustomerId ? (
+                    <p className="text-[10px] text-amber-400 flex items-center gap-1.5">
+                      <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                      يرجى اختيار عميل مسجل لديه باقة دفع مسبق.
+                    </p>
+                  ) : !customerBundle ? (
+                    <p className="text-[10px] text-red-400 flex items-center gap-1.5">
+                      <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                      هذا العميل ليس لديه باقة مشترك مفعلة.
+                    </p>
+                  ) : Number(customerBundle.balance) < Number(totalAmount) ? (
+                    <p className="text-[10px] text-red-400 flex items-center gap-1.5">
+                      <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                      رصيد الباقة الحالي ({Number(customerBundle.balance).toFixed(2)} ر.س) أقل من قيمة الفاتورة ({Number(totalAmount).toFixed(2)} ر.س).
+                    </p>
+                  ) : (
+                    <p className="text-[10px] text-green-400 flex items-center gap-1.5">
+                      <Check className="w-3.5 h-3.5 shrink-0" />
+                      الرصيد كافٍ. سيتم خصم {Number(totalAmount).toFixed(2)} ر.س من رصيد الباقة.
+                    </p>
+                  )}
+                </div>
+              )}
+              {paymentMethod === 'points_redemption' && (
+                <div className="mt-2 text-right font-medium">
+                  {activeCustomer && selectedService && (
+                    <p className="text-[10px] text-green-400 flex items-center gap-1.5 font-semibold">
+                      <Check className="w-3.5 h-3.5 shrink-0" />
+                      سيتم خصم {requiredPointsForFree} نقطة من رصيد العميل ({activeCustomer.points} نقطة) للحصول على خدمة ({selectedService.name}) مجاناً.
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Submit */}
             <button
               type="submit"
-              disabled={isSubmitting}
+              disabled={isSubmitting || serviceTypes.length === 0}
               className="w-full flex items-center justify-center gap-2 py-3.5 px-4 border border-transparent rounded-2xl text-sm font-semibold text-white premium-btn-primary shadow-md cursor-pointer disabled:opacity-50"
             >
               {isSubmitting ? 'جاري إنشاء الفاتورة…' : 'إنشاء وحفظ الفاتورة'}
@@ -511,6 +766,19 @@ export default function NewOrderPage() {
                   <span>الجوال:</span>
                   <span className="font-bold">{phone || 'غير مسجل'}</span>
                 </div>
+                <div className="flex justify-between">
+                  <span>طريقة الدفع:</span>
+                  <span className="font-bold">
+                    {paymentMethod === 'cash' ? 'نقدي' : 
+                     paymentMethod === 'package_subscriber' ? 'باقة المشترك' : 'استبدال نقاط (مجاني)'}
+                  </span>
+                </div>
+                {(success && createdInvoice?.created_by || createdBy) && (
+                  <div className="flex justify-between">
+                    <span>المستلم:</span>
+                    <span className="font-bold">{success && createdInvoice ? createdInvoice.created_by : createdBy}</span>
+                  </div>
+                )}
               </div>
 
               <div className="border-t border-dashed border-gray-400 my-2" />

@@ -15,7 +15,7 @@ import {
   X, 
   User, 
   ShieldCheck,
-  Building
+  Wallet
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -39,10 +39,11 @@ export default function DashboardLayout({
       return;
     }
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSession(activeSession);
     
-    // Redirect labor users if they try to access other paths
-    if (activeSession.role === 'labor' && pathname !== '/dashboard/new-order') {
+    // Redirect labor users if they try to access unauthorized paths
+    if (activeSession.role === 'labor' && pathname !== '/dashboard/new-order' && pathname !== '/dashboard/invoices') {
       router.push('/dashboard/new-order');
       return;
     }
@@ -90,12 +91,14 @@ export default function DashboardLayout({
   const navigation = session?.role === 'labor'
     ? [
         { name: 'طلب جديد', href: '/dashboard/new-order', icon: PlusCircle },
+        { name: 'الفواتير', href: '/dashboard/invoices', icon: FileSpreadsheet },
       ]
     : [
         { name: 'لوحة التحكم', href: '/dashboard', icon: LayoutDashboard },
         { name: 'طلب جديد', href: '/dashboard/new-order', icon: PlusCircle },
         { name: 'الفواتير', href: '/dashboard/invoices', icon: FileSpreadsheet },
         { name: 'العملاء', href: '/dashboard/customers', icon: Users },
+        { name: 'باقات المشتركين', href: '/dashboard/bundles', icon: Wallet },
         { name: 'الإعدادات', href: '/dashboard/settings', icon: Settings },
         { name: 'باقة الاشتراك', href: '/dashboard/subscription', icon: CreditCard },
       ];
@@ -193,6 +196,7 @@ export default function DashboardLayout({
               {pathname === '/dashboard/new-order' && 'إنشاء طلب وفاتورة ضريبية مبسطة'}
               {pathname.startsWith('/dashboard/invoices') && 'سجل وفواتير المبيعات'}
               {pathname.startsWith('/dashboard/customers') && 'قاعدة بيانات العملاء والولاء'}
+              {pathname.startsWith('/dashboard/bundles') && 'إدارة باقات المشتركين مسبقة الدفع'}
               {pathname.startsWith('/dashboard/settings') && 'إعدادات المتجر والصلاحيات'}
               {pathname.startsWith('/dashboard/subscription') && 'اشتراك مغسلتك السحابي'}
             </h1>

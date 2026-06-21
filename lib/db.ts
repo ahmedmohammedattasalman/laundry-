@@ -11,6 +11,11 @@ export interface Organization {
   whatsapp_number?: string;
   logo_url?: string;
   receipt_footer?: string;
+  points_for_free_service: number;
+  whatsapp_enabled: boolean;
+  evolution_api_url?: string;
+  evolution_api_token?: string;
+  evolution_instance_name?: string;
   created_at: string;
 }
 
@@ -56,8 +61,9 @@ export interface Invoice {
   total_amount: number;
   notes?: string;
   status: 'received' | 'processing' | 'completed' | 'delivered';
-  payment_method: 'cash' | 'package_subscriber';
+  payment_method: 'cash' | 'package_subscriber' | 'points_redemption';
   created_at: string;
+  created_by?: string;
 }
 
 export interface UserSession {
@@ -66,6 +72,32 @@ export interface UserSession {
   role: 'owner' | 'labor' | 'super_admin';
   name: string;
   organization_id?: string;
+}
+
+export interface ServiceType {
+  id: string;
+  organization_id: string;
+  name: string;
+  points_awarded: number;
+  points_to_redeem: number;
+  created_at: string;
+}
+
+export interface StaffMember {
+  id: string;
+  organization_id: string;
+  name: string;
+  created_at: string;
+}
+
+export interface Bundle {
+  id: string;
+  organization_id: string;
+  customer_id: string;
+  balance: number;
+  total_balance: number;
+  created_at: string;
+  expires_at?: string;
 }
 
 const supabase = createClient();
@@ -125,7 +157,7 @@ class LocalDatabase {
     const session: UserSession = {
       id: employee.id,
       email: employee.email,
-      role: employee.role as any,
+      role: employee.role as UserSession['role'],
       name: employee.name,
       organization_id: employee.organization_id
     };
@@ -134,14 +166,28 @@ class LocalDatabase {
     return session;
   }
 
-  async loginAdmin(email: string): Promise<UserSession> {
-    // Super admin login can be handled via Supabase auth or fallback mock
-    const session: UserSession = {
-      id: 'user-super-admin-01',
+  async loginAdmin(email: string, password?: string): Promise<UserSession> {
+    const pass = password || '12345678';
+    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
       email,
+      password: pass
+    });
+
+    if (authError) throw new Error(authError.message);
+    if (!authData.user) throw new Error('فشل تسجيل الدخول: المستخدم غير موجود.');
+
+    const role = (authData.user.app_metadata?.role || 'super_admin') as UserSession['role'];
+    if (role !== 'super_admin') {
+      throw new Error('عذراً، هذا الحساب لا يملك صلاحيات مدير النظام.');
+    }
+
+    const session: UserSession = {
+      id: authData.user.id,
+      email: authData.user.email || email,
       role: 'super_admin',
-      name: 'مدير النظام',
+      name: authData.user.user_metadata?.name || 'مدير النظام'
     };
+
     this.setSession(session);
     return session;
   }
@@ -149,62 +195,46 @@ class LocalDatabase {
   async register(email: string, orgName: string, name: string, password?: string): Promise<UserSession> {
     const pass = password || '12345678';
     
-    // 1. Sign up user in Supabase
+    // 1. Sign up user in Supabase with metadata (trigger handles database record creation)
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
       password: pass,
+      options: {
+        data: {
+          org_name: orgName,
+          full_name: name,
+          role: 'owner'
+        }
+      }
     });
 
     if (authError) throw new Error(authError.message);
     if (!authData.user) throw new Error('فشل إنشاء الحساب.');
 
+    // If email confirmation is enabled, the session will be null
+    if (!authData.session) {
+      throw new Error('CONFIRM_EMAIL_REQUIRED');
+    }
+
     const userId = authData.user.id;
 
-    // 2. Create organization
-    const { data: orgData, error: orgError } = await supabase
-      .from('organizations')
-      .insert({
-        owner_id: userId,
-        name: orgName,
-      })
-      .select()
+    // 2. Fetch the created employee profile (created automatically by DB trigger)
+    const { data: employee, error: empError } = await supabase
+      .from('employees')
+      .select('*')
+      .eq('id', userId)
       .single();
 
-    if (orgError || !orgData) {
-      throw new Error('فشل إنشاء المنشأة: ' + (orgError?.message || ''));
+    if (empError || !employee) {
+      throw new Error('فشل جلب بيانات الحساب المنشأ.');
     }
-
-    // 3. Create employee profile for the owner
-    const { error: empError } = await supabase
-      .from('employees')
-      .insert({
-        id: userId,
-        organization_id: orgData.id,
-        name: name,
-        email: email,
-        role: 'owner',
-      });
-
-    if (empError) {
-      throw new Error('فشل إنشاء ملف الموظف للمالك: ' + empError.message);
-    }
-
-    // 4. Create default subscription
-    await supabase
-      .from('subscriptions')
-      .insert({
-        organization_id: orgData.id,
-        plan_name: 'اشتراك المغسلة السحابي',
-        status: 'inactive',
-        expires_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
-      });
 
     const session: UserSession = {
       id: userId,
       email,
       role: 'owner',
       name: name,
-      organization_id: orgData.id
+      organization_id: employee.organization_id
     };
 
     this.setSession(session);
@@ -365,6 +395,39 @@ class LocalDatabase {
     const nextSeq = (count || 0) + 1001;
     const invoiceNumber = `INV-${nextSeq}`;
 
+    // 1. If points_redemption, validate and deduct customer points based on selected service type
+    if (invoiceData.payment_method === 'points_redemption') {
+      const { data: stData } = await supabase
+        .from('service_types')
+        .select('points_to_redeem')
+        .eq('organization_id', orgId)
+        .eq('name', invoiceData.service_type)
+        .maybeSingle();
+
+      const pointsToDeduct = stData?.points_to_redeem ?? 0;
+      if (pointsToDeduct <= 0) {
+        throw new Error('هذه الخدمة غير قابلة للاستبدال بالنقاط.');
+      }
+      
+      const { data: cust } = await supabase
+        .from('customers')
+        .select('points')
+        .eq('id', invoiceData.customer_id)
+        .single();
+      
+      if (!cust || cust.points < pointsToDeduct) {
+        throw new Error(`رصيد نقاط العميل غير كافٍ. النقاط المطلوبة: ${pointsToDeduct} نقطة.`);
+      }
+      
+      // Deduct points
+      const { error: deductError } = await supabase
+        .from('customers')
+        .update({ points: cust.points - pointsToDeduct })
+        .eq('id', invoiceData.customer_id);
+        
+      if (deductError) throw new Error(deductError.message);
+    }
+
     const { data, error } = await supabase
       .from('invoices')
       .insert({
@@ -377,9 +440,22 @@ class LocalDatabase {
 
     if (error) throw new Error(error.message);
 
-    const pointsAwarded = Math.floor(invoiceData.total_amount / 10);
-    if (pointsAwarded > 0) {
-      await this.addCustomerPoints(invoiceData.customer_id, pointsAwarded);
+    // 2. Award points if it's not a points redemption
+    if (invoiceData.payment_method !== 'points_redemption') {
+      // Find the service type points
+      const { data: stData } = await supabase
+        .from('service_types')
+        .select('points_awarded')
+        .eq('organization_id', orgId)
+        .eq('name', invoiceData.service_type)
+        .maybeSingle();
+
+      const pointsPerPiece = stData?.points_awarded ?? 1;
+      const pointsAwarded = Number(invoiceData.pieces_count) * pointsPerPiece;
+      
+      if (pointsAwarded > 0) {
+        await this.addCustomerPoints(invoiceData.customer_id, pointsAwarded);
+      }
     }
 
     return data;
@@ -405,9 +481,9 @@ class LocalDatabase {
     return data || [];
   }
 
-  async createEmployee(orgId: string, name: string, email: string): Promise<Employee> {
+  async createEmployee(orgId: string, name: string, email: string, password?: string): Promise<Employee> {
     const authClient = createAuthClient();
-    const pass = '12345678';
+    const pass = password || '12345678';
     
     // Register user in Supabase Auth
     const { data: authData, error: authError } = await authClient.auth.signUp({
@@ -571,7 +647,7 @@ class LocalDatabase {
   }
 
   // Promo Codes helpers
-  async getPromoCodes(): Promise<any[]> {
+  async getPromoCodes(): Promise<any[]> { // eslint-disable-line @typescript-eslint/no-explicit-any
     const { data, error } = await supabase
       .from('promo_codes')
       .select('*')
@@ -580,7 +656,7 @@ class LocalDatabase {
     return data || [];
   }
 
-  async createPromoCode(code: string, type: 'trial' | 'discount_percent' | 'discount_amount', value: number): Promise<any> {
+  async createPromoCode(code: string, type: 'trial' | 'discount_percent' | 'discount_amount', value: number): Promise<any> { // eslint-disable-line @typescript-eslint/no-explicit-any
     const { data, error } = await supabase
       .from('promo_codes')
       .insert({ code: code.toUpperCase().trim(), type, value })
@@ -598,7 +674,7 @@ class LocalDatabase {
     if (error) throw new Error(error.message);
   }
 
-  async verifyPromoCode(code: string): Promise<any> {
+  async verifyPromoCode(code: string): Promise<any> { // eslint-disable-line @typescript-eslint/no-explicit-any
     const { data, error } = await supabase
       .from('promo_codes')
       .select('*')
@@ -607,6 +683,170 @@ class LocalDatabase {
       .maybeSingle();
     if (error) throw new Error(error.message);
     return data;
+  }
+
+  // Service Types helpers
+  async getServiceTypes(orgId: string): Promise<ServiceType[]> {
+    const { data, error } = await supabase
+      .from('service_types')
+      .select('*')
+      .eq('organization_id', orgId)
+      .order('created_at', { ascending: true });
+    
+    if (error) return [];
+    return data || [];
+  }
+
+  async createServiceType(orgId: string, name: string, pointsAwarded: number = 1, pointsToRedeem: number = 0): Promise<ServiceType> {
+    const { data, error } = await supabase
+      .from('service_types')
+      .insert({
+        organization_id: orgId,
+        name: name.trim(),
+        points_awarded: pointsAwarded,
+        points_to_redeem: pointsToRedeem
+      })
+      .select()
+      .single();
+    
+    if (error) throw new Error(error.message);
+    return data;
+  }
+
+  async updateServiceTypePoints(serviceId: string, points: number): Promise<void> {
+    const { error } = await supabase
+      .from('service_types')
+      .update({ points_awarded: points })
+      .eq('id', serviceId);
+    
+    if (error) throw new Error(error.message);
+  }
+
+  async updateServiceTypeRedeemPoints(serviceId: string, points: number): Promise<void> {
+    const { error } = await supabase
+      .from('service_types')
+      .update({ points_to_redeem: points })
+      .eq('id', serviceId);
+    
+    if (error) throw new Error(error.message);
+  }
+
+  async deleteServiceType(serviceId: string): Promise<void> {
+    const { error } = await supabase
+      .from('service_types')
+      .delete()
+      .eq('id', serviceId);
+    
+    if (error) throw new Error(error.message);
+  }
+
+  // Staff Members helpers
+  async getStaffMembers(orgId: string): Promise<StaffMember[]> {
+    const { data, error } = await supabase
+      .from('staff_members')
+      .select('*')
+      .eq('organization_id', orgId)
+      .order('created_at', { ascending: true });
+    
+    if (error) return [];
+    return data || [];
+  }
+
+  async createStaffMember(orgId: string, name: string): Promise<StaffMember> {
+    const { data, error } = await supabase
+      .from('staff_members')
+      .insert({
+        organization_id: orgId,
+        name: name.trim()
+      })
+      .select()
+      .single();
+    
+    if (error) throw new Error(error.message);
+    return data;
+  }
+
+  async deleteStaffMember(memberId: string): Promise<void> {
+    const { error } = await supabase
+      .from('staff_members')
+      .delete()
+      .eq('id', memberId);
+    
+    if (error) throw new Error(error.message);
+  }
+
+  // Bundles helpers
+  async getBundles(orgId: string): Promise<(Bundle & { customer_name?: string; customer_phone?: string })[]> {
+    const { data, error } = await supabase
+      .from('bundles')
+      .select('*, customers(name, phone)')
+      .eq('organization_id', orgId)
+      .order('created_at', { ascending: false });
+    
+    if (error) return [];
+    return (data || []).map((item: Bundle & { customers: { name: string; phone: string } | null }) => ({
+      ...item,
+      customer_name: item.customers?.name,
+      customer_phone: item.customers?.phone
+    }));
+  }
+
+  async getCustomerBundle(customerId: string): Promise<Bundle | null> {
+    const { data, error } = await supabase
+      .from('bundles')
+      .select('*')
+      .eq('customer_id', customerId)
+      .maybeSingle();
+    
+    if (error) return null;
+    return data;
+  }
+
+  async createOrUpdateBundle(orgId: string, customerId: string, amount: number): Promise<Bundle> {
+    const existing = await this.getCustomerBundle(customerId);
+    if (existing) {
+      const { data, error } = await supabase
+        .from('bundles')
+        .update({
+          balance: Number(existing.balance) + Number(amount),
+          total_balance: Number(existing.total_balance) + Number(amount)
+        })
+        .eq('id', existing.id)
+        .select()
+        .single();
+      if (error) throw new Error(error.message);
+      return data;
+    } else {
+      const { data, error } = await supabase
+        .from('bundles')
+        .insert({
+          organization_id: orgId,
+          customer_id: customerId,
+          balance: Number(amount),
+          total_balance: Number(amount)
+        })
+        .select()
+        .single();
+      if (error) throw new Error(error.message);
+      return data;
+    }
+  }
+
+  async deductBundleBalance(customerId: string, amount: number): Promise<void> {
+    const bundle = await this.getCustomerBundle(customerId);
+    if (!bundle) throw new Error('لا توجد باقة مفعلة لهذا العميل.');
+    if (Number(bundle.balance) < Number(amount)) {
+      throw new Error(`رصيد الباقة غير كافٍ. الرصيد الحالي: ${bundle.balance} ر.س.`);
+    }
+    
+    const { error } = await supabase
+      .from('bundles')
+      .update({
+        balance: Number(bundle.balance) - Number(amount)
+      })
+      .eq('id', bundle.id);
+    
+    if (error) throw new Error(error.message);
   }
 }
 

@@ -17,6 +17,11 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 
+const toArabicNumerals = (num: number | string) => {
+  const arabicDigits = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
+  return String(num).replace(/[0-9]/g, (w) => arabicDigits[+w]);
+};
+
 export default function DashboardPage() {
   const router = useRouter();
   const [session, setSession] = useState<UserSession | null>(null);
@@ -27,6 +32,59 @@ export default function DashboardPage() {
     totalInvoices: 0,
     todayRevenue: 0,
     monthlyRevenue: 0
+  });
+
+  // Calculate service distribution dynamically
+  const getServiceDistribution = () => {
+    const currentMonth = new Date().getMonth();
+    const currentYear = new Date().getFullYear();
+    const monthInvoices = invoices.filter(inv => {
+      const d = new Date(inv.created_at);
+      return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+    });
+    
+    const targetInvoices = monthInvoices.length > 0 ? monthInvoices : invoices;
+    
+    if (targetInvoices.length === 0) {
+      return [];
+    }
+
+    const counts: Record<string, number> = {};
+    targetInvoices.forEach(inv => {
+      const type = inv.service_type || 'أخرى';
+      counts[type] = (counts[type] || 0) + 1;
+    });
+
+    const total = targetInvoices.length;
+    const distribution = Object.entries(counts).map(([name, count]) => ({
+      name,
+      count,
+      percentage: Math.round((count / total) * 100),
+      fraction: count / total
+    }));
+
+    // Sort by count descending
+    distribution.sort((a, b) => b.count - a.count);
+
+    return distribution;
+  };
+
+  const dist = getServiceDistribution();
+  const colors = ['#7172ef', '#06b6d4', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981'];
+  const bgColors = ['bg-brand-500', 'bg-cyan-500', 'bg-purple-500', 'bg-pink-500', 'bg-amber-500', 'bg-emerald-500'];
+  
+  let currentAccumulated = 0;
+  const chartSegments = dist.map((item, index) => {
+    const color = colors[index % colors.length];
+    const bgColor = bgColors[index % bgColors.length];
+    const rotation = currentAccumulated * 360;
+    currentAccumulated += item.fraction;
+    return {
+      ...item,
+      color,
+      bgColor,
+      rotation,
+    };
   });
 
   useEffect(() => {
@@ -278,7 +336,14 @@ export default function DashboardPage() {
         <div className="premium-card rounded-3xl p-6 flex flex-col justify-between">
           <div>
             <h3 className="text-base font-bold text-white mb-1 font-heading">توزيع طلبات الخدمات</h3>
-            <p className="text-[11px] text-slate-500 mb-6">تحليل بياني للخدمات التي يطلبها عملاؤك هذا الشهر.</p>
+            <p className="text-[11px] text-slate-500 mb-6">
+              {invoices.filter(inv => {
+                const d = new Date(inv.created_at);
+                return d.getMonth() === new Date().getMonth() && d.getFullYear() === new Date().getFullYear();
+              }).length > 0 
+                ? 'تحليل بياني للخدمات التي يطلبها عملاؤك هذا الشهر.' 
+                : 'تحليل بياني للخدمات التي يطلبها عملاؤك (كل الأوقات).'}
+            </p>
 
             {/* Custom SVG Distribution Chart */}
             <div className="relative flex items-center justify-center py-6">
@@ -292,77 +357,70 @@ export default function DashboardPage() {
                   stroke="rgba(255,255,255,0.02)"
                   strokeWidth="12"
                 />
-                {/* Dry Cleaning: 55% */}
-                <circle
-                  cx="80"
-                  cy="80"
-                  r="64"
-                  fill="transparent"
-                  stroke="#7172ef"
-                  strokeWidth="12"
-                  strokeDasharray={`${2 * Math.PI * 64}`}
-                  strokeDashoffset={`${2 * Math.PI * 64 * (1 - 0.55)}`}
-                  strokeLinecap="round"
-                  className="transition-all duration-1000"
-                />
-                {/* Wash & Fold: 30% */}
-                <circle
-                  cx="80"
-                  cy="80"
-                  r="64"
-                  fill="transparent"
-                  stroke="#06b6d4"
-                  strokeWidth="12"
-                  strokeDasharray={`${2 * Math.PI * 64}`}
-                  strokeDashoffset={`${2 * Math.PI * 64 * (1 - 0.30)}`}
-                  strokeLinecap="round"
-                  transform="rotate(198, 80, 80)"
-                  className="transition-all duration-1000"
-                />
-                {/* Ironing Only: 15% */}
-                <circle
-                  cx="80"
-                  cy="80"
-                  r="64"
-                  fill="transparent"
-                  stroke="#8b5cf6"
-                  strokeWidth="12"
-                  strokeDasharray={`${2 * Math.PI * 64}`}
-                  strokeDashoffset={`${2 * Math.PI * 64 * (1 - 0.15)}`}
-                  strokeLinecap="round"
-                  transform="rotate(306, 80, 80)"
-                  className="transition-all duration-1000"
-                />
+                {chartSegments.map((seg, idx) => {
+                  const r = 64;
+                  const circumference = 2 * Math.PI * r;
+                  const strokeDashoffset = circumference * (1 - seg.fraction);
+                  return (
+                    <circle
+                      key={idx}
+                      cx="80"
+                      cy="80"
+                      r={r}
+                      fill="transparent"
+                      stroke={seg.color}
+                      strokeWidth="12"
+                      strokeDasharray={`${circumference}`}
+                      strokeDashoffset={`${strokeDashoffset}`}
+                      strokeLinecap="round"
+                      transform={`rotate(${seg.rotation}, 80, 80)`}
+                      className="transition-all duration-1000"
+                    />
+                  );
+                })}
               </svg>
               <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">تنظيف جاف</span>
-                <span className="text-xl font-black text-white mt-0.5 font-heading">٥٥٪</span>
+                {chartSegments.length > 0 ? (
+                  <>
+                    <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider text-center max-w-[100px] truncate">
+                      {chartSegments[0].name}
+                    </span>
+                    <span className="text-xl font-black text-white mt-0.5 font-heading">
+                      {toArabicNumerals(chartSegments[0].percentage)}٪
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">
+                      لا توجد بيانات
+                    </span>
+                    <span className="text-xl font-black text-white mt-0.5 font-heading">
+                      ٠٪
+                    </span>
+                  </>
+                )}
               </div>
             </div>
 
             {/* Legends */}
             <div className="space-y-3 mt-4 border-t border-dark-border pt-4">
-              <div className="flex items-center justify-between text-[11px]">
-                <div className="flex items-center gap-2 text-slate-300">
-                  <span className="w-2.5 h-2.5 rounded-full bg-brand-500 block" />
-                  <span>تنظيف جاف وسريع</span>
+              {chartSegments.length > 0 ? (
+                chartSegments.map((seg, idx) => (
+                  <div key={idx} className="flex items-center justify-between text-[11px]">
+                    <div className="flex items-center gap-2 text-slate-300">
+                      <span className={`w-2.5 h-2.5 rounded-full ${seg.bgColor} block`} />
+                      <span>{seg.name}</span>
+                    </div>
+                    <span className="text-slate-400 font-bold font-mono">
+                      {toArabicNumerals(seg.percentage)}٪
+                    </span>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center text-[11px] text-slate-500 py-2">
+                  لم يتم تسجيل أي فواتير بعد.
                 </div>
-                <span className="text-slate-400 font-bold font-mono">٥٥٪</span>
-              </div>
-              <div className="flex items-center justify-between text-[11px]">
-                <div className="flex items-center gap-2 text-slate-300">
-                  <span className="w-2.5 h-2.5 rounded-full bg-cyan-500 block" />
-                  <span>غسيل وكي ملابس</span>
-                </div>
-                <span className="text-slate-400 font-bold font-mono">٣٠٪</span>
-              </div>
-              <div className="flex items-center justify-between text-[11px]">
-                <div className="flex items-center gap-2 text-slate-300">
-                  <span className="w-2.5 h-2.5 rounded-full bg-purple-500 block" />
-                  <span>كي فقط بالبخار</span>
-                </div>
-                <span className="text-slate-400 font-bold font-mono">١٥٪</span>
-              </div>
+              )}
             </div>
           </div>
         </div>

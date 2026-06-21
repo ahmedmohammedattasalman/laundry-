@@ -14,6 +14,11 @@ create table public.organizations (
     whatsapp_number text,
     logo_url text,
     receipt_footer text,
+    points_for_free_service integer not null default 100,
+    whatsapp_enabled boolean not null default true,
+    evolution_api_url text,
+    evolution_api_token text,
+    evolution_instance_name text,
     created_at timestamptz not null default now()
 );
 
@@ -212,8 +217,9 @@ create table public.invoices (
     total_amount numeric(10, 2) not null check (total_amount >= 0),
     notes text,
     status text not null check (status in ('received', 'processing', 'completed', 'delivered')),
-    payment_method text not null check (payment_method in ('cash', 'package_subscriber')),
+    payment_method text not null check (payment_method in ('cash', 'package_subscriber', 'points_redemption')),
     created_at timestamptz not null default now(),
+    created_by text,
     unique (organization_id, invoice_number) -- Invoice number unique per organization
 );
 
@@ -222,5 +228,60 @@ alter table public.invoices enable row level security;
 
 create policy "Employees can perform all actions on invoices of their organization"
     on public.invoices for all
+    using (organization_id = (select public.get_user_org_id()))
+    with check (organization_id = (select public.get_user_org_id()));
+
+-- 6. Service Types
+create table public.service_types (
+    id uuid primary key default gen_random_uuid(),
+    organization_id uuid not null references public.organizations(id) on delete cascade,
+    name text not null,
+    points_awarded integer not null default 1,
+    points_to_redeem integer not null default 0,
+    created_at timestamptz not null default now(),
+    unique (organization_id, name)
+);
+
+-- Enable RLS for service_types
+alter table public.service_types enable row level security;
+
+create policy "Employees can perform all actions on service_types of their organization"
+    on public.service_types for all
+    using (organization_id = (select public.get_user_org_id()))
+    with check (organization_id = (select public.get_user_org_id()));
+
+-- 7. Staff Members
+create table public.staff_members (
+    id uuid primary key default gen_random_uuid(),
+    organization_id uuid not null references public.organizations(id) on delete cascade,
+    name text not null,
+    created_at timestamptz not null default now(),
+    unique (organization_id, name)
+);
+
+-- Enable RLS for staff_members
+alter table public.staff_members enable row level security;
+
+create policy "Employees can perform all actions on staff_members of their organization"
+    on public.staff_members for all
+    using (organization_id = (select public.get_user_org_id()))
+    with check (organization_id = (select public.get_user_org_id()));
+
+-- 8. Customer Prepaid Bundles
+create table public.bundles (
+    id uuid primary key default gen_random_uuid(),
+    organization_id uuid not null references public.organizations(id) on delete cascade,
+    customer_id uuid not null references public.customers(id) on delete cascade unique,
+    balance numeric(10, 2) not null check (balance >= 0),
+    total_balance numeric(10, 2) not null check (total_balance >= 0),
+    created_at timestamptz not null default now(),
+    expires_at timestamptz
+);
+
+-- Enable RLS for bundles
+alter table public.bundles enable row level security;
+
+create policy "Employees can perform all actions on bundles of their organization"
+    on public.bundles for all
     using (organization_id = (select public.get_user_org_id()))
     with check (organization_id = (select public.get_user_org_id()));

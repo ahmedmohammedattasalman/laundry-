@@ -43,10 +43,6 @@ export default function InvoicesPage() {
         router.push('/login');
         return;
       }
-      if (session.role === 'labor') {
-        router.push('/dashboard/new-order');
-        return;
-      }
 
       if (session.organization_id) {
         const orgId = session.organization_id;
@@ -71,7 +67,6 @@ export default function InvoicesPage() {
     }
   };
 
-  // Status transitions
   const handleUpdateStatus = async (invoiceId: string, newStatus: Invoice['status']) => {
     try {
       const updated = await db.updateInvoiceStatus(invoiceId, newStatus);
@@ -79,6 +74,17 @@ export default function InvoicesPage() {
       
       // Keep details drawer updated
       setSelectedInvoice(updated);
+
+      // Trigger automatic WhatsApp status update message in the background
+      fetch('/api/whatsapp/send-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          invoiceId,
+          event: 'status_change',
+          newStatus
+        })
+      }).catch(err => console.error('Failed to send automatic WhatsApp status update:', err));
     } catch (err) {
       console.error(err);
     }
@@ -151,7 +157,8 @@ export default function InvoicesPage() {
       `رقم الفاتورة: ${inv.invoice_number}\n` +
       `نوع الخدمة: ${inv.service_type}\n` +
       `عدد القطع: ${inv.pieces_count}\n` +
-      `المبلغ الإجمالي: ${Number(inv.total_amount).toFixed(2)} ر.س (شامل ضريبة القيمة المضافة ١٥٪)\n\n` +
+      `المبلغ الإجمالي: ${Number(inv.total_amount).toFixed(2)} ر.س (شامل ضريبة القيمة المضافة ١٥٪)\n` +
+      (inv.created_by ? `المستلم: ${inv.created_by}\n` : '') + '\n' +
       `نشكركم على اختياركم لنا!`;
     
     return `https://wa.me/${customer.phone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(message)}`;
@@ -232,7 +239,14 @@ export default function InvoicesPage() {
                           <p className="text-[10px] text-slate-500 font-semibold font-mono mt-0.5">{customer?.phone}</p>
                         </div>
                       </td>
-                      <td className="py-4 text-slate-450">{inv.service_type}</td>
+                      <td className="py-4 text-slate-450">
+                        <div>
+                          <p>{inv.service_type}</p>
+                          {inv.created_by && (
+                            <p className="text-[10px] text-slate-500 font-semibold mt-0.5">بواسطة: {inv.created_by}</p>
+                          )}
+                        </div>
+                      </td>
                       <td className="py-4 text-slate-300 font-bold font-mono">{inv.pieces_count}</td>
                       <td className="py-4 font-bold font-mono text-slate-200">
                         {Number(inv.total_amount).toFixed(2)} ر.س
@@ -396,6 +410,12 @@ export default function InvoicesPage() {
                         <span>الجوال:</span>
                         <span className="font-bold">{customer?.phone || 'غير مسجل'}</span>
                       </div>
+                      {selectedInvoice.created_by && (
+                        <div className="flex justify-between">
+                          <span>المستلم:</span>
+                          <span className="font-bold">{selectedInvoice.created_by}</span>
+                        </div>
+                      )}
                     </div>
 
                     <div className="border-t border-dashed border-gray-400 my-1.5" />
