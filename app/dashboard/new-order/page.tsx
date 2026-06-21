@@ -358,7 +358,7 @@ export default function NewOrderPage() {
                 رقم جوال العميل
               </label>
               <div className="relative">
-                <div className="absolute inset-y-0 start-0 ps-3.5 flex items-center pointer-events-none text-slate-500">
+                <div className="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none text-slate-500">
                   <Phone className="h-4 w-4" />
                 </div>
                 <input
@@ -367,7 +367,7 @@ export default function NewOrderPage() {
                   required
                   value={phone}
                   onChange={(e) => handlePhoneChange(e.target.value)}
-                  className="block w-full ps-11 pe-3.5 py-3.5 text-sm premium-input text-right font-mono"
+                  className="block w-full pr-11 pl-3.5 py-3.5 text-sm premium-input text-right font-mono"
                   placeholder="مثال: 0501234567"
                 />
               </div>
@@ -511,7 +511,7 @@ export default function NewOrderPage() {
                   عدد القطع
                 </label>
                 <div className="relative">
-                  <div className="absolute inset-y-0 start-0 ps-3.5 flex items-center pointer-events-none text-slate-500">
+                  <div className="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none text-slate-500">
                     <Hash className="h-4 w-4" />
                   </div>
                   <input
@@ -521,7 +521,7 @@ export default function NewOrderPage() {
                     min={1}
                     value={piecesCount}
                     onChange={(e) => setPiecesCount(Math.max(1, Number(e.target.value)))}
-                    className="block w-full ps-11 pe-3.5 py-3.5 text-sm premium-input text-right font-mono"
+                    className="block w-full pr-11 pl-3.5 py-3.5 text-sm premium-input text-right font-mono"
                   />
                 </div>
               </div>
@@ -533,7 +533,7 @@ export default function NewOrderPage() {
                 المبلغ الخاضع للضريبة (ر.س)
               </label>
               <div className="relative">
-                <div className="absolute inset-y-0 start-0 ps-3.5 flex items-center pointer-events-none text-slate-500">
+                <div className="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none text-slate-500">
                   <BadgeCent className="h-4 w-4" />
                 </div>
                 <input
@@ -545,7 +545,7 @@ export default function NewOrderPage() {
                   disabled={isRedeemingPoints}
                   value={isRedeemingPoints ? 0 : amount}
                   onChange={(e) => setAmount(Math.max(0.1, Number(e.target.value)))}
-                  className="block w-full ps-11 pe-3.5 py-3.5 text-sm premium-input font-mono text-right disabled:opacity-50"
+                  className="block w-full pr-11 pl-3.5 py-3.5 text-sm premium-input font-mono text-right disabled:opacity-50"
                 />
               </div>
             </div>
