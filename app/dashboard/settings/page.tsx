@@ -50,6 +50,13 @@ export default function SettingsPage() {
   const [laborEmail, setLaborEmail] = useState('');
   const [laborPassword, setLaborPassword] = useState('');
 
+  // Password change states
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordSuccess, setPasswordSuccess] = useState(false);
+  const [passwordError, setPasswordError] = useState('');
+  const [passwordLoading, setPasswordLoading] = useState(false);
+
   // Staff Members (Names) states
   const [staffMembers, setStaffMembers] = useState<StaffMember[]>([]);
   const [newStaffName, setNewStaffName] = useState('');
@@ -170,6 +177,37 @@ export default function SettingsPage() {
       setTestError(errMsg);
     } finally {
       setTestingConnection(false);
+    }
+  };
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newPassword || !confirmPassword) {
+      setPasswordError('الرجاء تعبئة جميع الحقول.');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordError('كلمتا المرور غير متطابقتين.');
+      return;
+    }
+    if (newPassword.length < 6) {
+      setPasswordError('يجب أن تتكون كلمة المرور من 6 أحرف على الأقل.');
+      return;
+    }
+    setPasswordLoading(true);
+    setPasswordError('');
+    setPasswordSuccess(false);
+
+    try {
+      await db.updatePassword(newPassword);
+      setPasswordSuccess(true);
+      setNewPassword('');
+      setConfirmPassword('');
+      setTimeout(() => setPasswordSuccess(false), 3000);
+    } catch (err: any) {
+      setPasswordError(err?.message || 'فشل تغيير كلمة المرور. يرجى المحاولة مرة أخرى.');
+    } finally {
+      setPasswordLoading(false);
     }
   };
 
@@ -561,6 +599,68 @@ export default function SettingsPage() {
         {/* Right Column (Span 1): Employee Accounts Manager */}
         <div className="space-y-8">
           
+          {/* Change Password Card */}
+          <div className="premium-card rounded-3xl p-6 space-y-4">
+            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2 font-heading">
+              <Lock className="w-4 h-4 text-brand-400" />
+              تغيير كلمة المرور الشخصية
+            </h3>
+
+            <form onSubmit={handleChangePassword} className="space-y-3">
+              {passwordError && (
+                <div className="p-2.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-[10px] font-bold text-center animate-fade-in">
+                  {passwordError}
+                </div>
+              )}
+
+              <div className="space-y-1">
+                <div className="relative">
+                  <div className="absolute inset-y-0 start-0 ps-3.5 flex items-center pointer-events-none text-slate-500">
+                    <Lock className="h-4 w-4" />
+                  </div>
+                  <input
+                    type="password"
+                    required
+                    placeholder="كلمة المرور الجديدة"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    className="block w-full ps-11 pe-3.5 py-3 text-xs premium-input font-mono text-right"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <div className="relative">
+                  <div className="absolute inset-y-0 start-0 ps-3.5 flex items-center pointer-events-none text-slate-500">
+                    <Lock className="h-4 w-4" />
+                  </div>
+                  <input
+                    type="password"
+                    required
+                    placeholder="تأكيد كلمة المرور الجديدة"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    className="block w-full ps-11 pe-3.5 py-3 text-xs premium-input font-mono text-right"
+                  />
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={passwordLoading}
+                className="w-full flex items-center justify-center gap-2 py-3 px-4 border border-transparent rounded-2xl text-xs font-bold text-white premium-btn-primary shadow-sm cursor-pointer disabled:opacity-50"
+              >
+                {passwordLoading ? 'جاري التحديث...' : 'تحديث كلمة المرور'}
+              </button>
+            </form>
+
+            {passwordSuccess && (
+              <div className="p-2.5 rounded-xl bg-green-500/10 border border-green-500/20 text-green-400 text-[10px] font-bold text-center animate-fade-in">
+                تم تحديث كلمة المرور بنجاح!
+              </div>
+            )}
+          </div>
+
           {/* Shared Receptionist Account Card */}
           <div className="premium-card rounded-3xl p-6 space-y-4">
             <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2 font-heading">

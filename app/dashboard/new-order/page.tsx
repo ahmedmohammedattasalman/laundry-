@@ -143,8 +143,7 @@ export default function NewOrderPage() {
   const totalAmount = currentBaseAmount + vatAmount;
 
   // Submit Handler
-  const handleCreateOrder = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const submitOrder = async () => {
     if (!session?.organization_id) return;
     setIsSubmitting(true);
     setSuccess(false);
@@ -263,6 +262,18 @@ export default function NewOrderPage() {
     }
   };
 
+  const handleCreateOrder = (e: React.FormEvent) => {
+    e.preventDefault();
+    submitOrder();
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement | HTMLSelectElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      submitOrder();
+    }
+  };
+
   // ZATCA Base64 string for QR Code
   const getZatcaQRData = () => {
     if (!organization || !createdInvoice) return '';
@@ -367,6 +378,7 @@ export default function NewOrderPage() {
                   required
                   value={phone}
                   onChange={(e) => handlePhoneChange(e.target.value)}
+                  onKeyDown={handleKeyDown}
                   className="block w-full pr-11 pl-3.5 py-3.5 text-sm premium-input text-right font-mono"
                   placeholder="مثال: 0501234567"
                 />
@@ -417,6 +429,7 @@ export default function NewOrderPage() {
                       setPaymentMethod('cash');
                     }
                   }}
+                  onKeyDown={handleKeyDown}
                   className="block w-full ps-11 pe-3.5 py-3.5 text-sm premium-input text-right"
                   placeholder="مثال: محمد عثمان"
                 />
@@ -453,6 +466,7 @@ export default function NewOrderPage() {
                     id="created-by"
                     value={createdBy}
                     onChange={(e) => setCreatedBy(e.target.value)}
+                    onKeyDown={handleKeyDown}
                     className="block w-full ps-11 pe-3.5 py-3.5 text-sm premium-input appearance-none cursor-pointer text-right"
                   >
                     {staffMembers.map((sm) => (
@@ -468,6 +482,7 @@ export default function NewOrderPage() {
                     required
                     value={createdBy}
                     onChange={(e) => setCreatedBy(e.target.value)}
+                    onKeyDown={handleKeyDown}
                     placeholder="اسم موظف الاستقبال"
                     className="block w-full ps-11 pe-3.5 py-3.5 text-sm premium-input text-right"
                   />
@@ -490,6 +505,7 @@ export default function NewOrderPage() {
                       id="service-type"
                       value={serviceType}
                       onChange={(e) => setServiceType(e.target.value)}
+                      onKeyDown={handleKeyDown}
                       className="block w-full ps-11 pe-3.5 py-3.5 text-sm premium-input appearance-none cursor-pointer text-right"
                     >
                       {serviceTypes.map((st) => (
@@ -521,6 +537,7 @@ export default function NewOrderPage() {
                     min={1}
                     value={piecesCount}
                     onChange={(e) => setPiecesCount(Math.max(1, Number(e.target.value)))}
+                    onKeyDown={handleKeyDown}
                     className="block w-full pr-11 pl-3.5 py-3.5 text-sm premium-input text-right font-mono"
                   />
                 </div>
@@ -545,6 +562,7 @@ export default function NewOrderPage() {
                   disabled={isRedeemingPoints}
                   value={isRedeemingPoints ? 0 : amount}
                   onChange={(e) => setAmount(Math.max(0.1, Number(e.target.value)))}
+                  onKeyDown={handleKeyDown}
                   className="block w-full pr-11 pl-3.5 py-3.5 text-sm premium-input font-mono text-right disabled:opacity-50"
                 />
               </div>

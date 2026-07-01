@@ -70,6 +70,7 @@ export default function AdminLayout({
     { name: 'نظرة عامة', href: '/admin', icon: LayoutDashboard },
     { name: 'إدارة المغاسل', href: '/admin/laundries', icon: Building2 },
     { name: 'الاشتراكات والمالية', href: '/admin/billing', icon: CreditCard },
+    { name: 'إعدادات الحساب', href: '/admin/settings', icon: Settings },
   ];
 
   const isCurrent = (href: string) => {
@@ -160,6 +161,7 @@ export default function AdminLayout({
               {pathname === '/admin' && 'نظرة عامة على النظام'}
               {pathname === '/admin/laundries' && 'إدارة المغاسل والمنشآت'}
               {pathname === '/admin/billing' && 'الاشتراكات والمالية'}
+              {pathname === '/admin/settings' && 'إعدادات الحساب الإداري'}
             </h1>
           </div>
 

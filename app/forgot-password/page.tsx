@@ -3,20 +3,28 @@
 import React, { useState } from 'react';
 import { Mail, ArrowLeft, ArrowRight, KeyRound } from 'lucide-react';
 import Link from 'next/link';
+import { db } from '@/lib/db';
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setError('');
 
-    setTimeout(() => {
+    try {
+      const redirectTo = `${window.location.origin}/auth/callback?next=/reset-password`;
+      await db.resetPasswordForEmail(email, redirectTo);
       setSubmitted(true);
+    } catch (err: any) {
+      setError(err?.message || 'حدث خطأ أثناء إرسال رابط إعادة تعيين كلمة المرور.');
+    } finally {
       setLoading(false);
-    }, 1200);
+    }
   };
 
   return (
@@ -42,6 +50,11 @@ export default function ForgotPasswordPage() {
         <div className="glass-panel rounded-3xl p-8 border border-slate-800 shadow-float">
           {!submitted ? (
             <form className="space-y-6" onSubmit={handleSubmit}>
+              {error && (
+                <div className="p-3.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-medium">
+                  {error}
+                </div>
+              )}
               <div className="space-y-1">
                 <label htmlFor="email-address" className="text-xs font-semibold text-slate-300">
                   البريد الإلكتروني المسجل

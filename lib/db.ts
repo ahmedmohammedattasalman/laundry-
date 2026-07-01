@@ -343,7 +343,7 @@ class LocalDatabase {
         organization_id: orgId,
         name,
         phone,
-        points: 10
+        points: 0
       })
       .select()
       .single();
@@ -846,6 +846,63 @@ class LocalDatabase {
       })
       .eq('id', bundle.id);
     
+    if (error) throw new Error(error.message);
+  }
+
+  async resetPasswordForEmail(email: string, redirectTo: string): Promise<void> {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
+    if (error) throw new Error(error.message);
+  }
+
+  async updatePassword(password: string): Promise<void> {
+    const { error } = await supabase.auth.updateUser({ password });
+    if (error) throw new Error(error.message);
+  }
+
+  async syncSession(): Promise<UserSession | null> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      this.setSession(null);
+      return null;
+    }
+
+    // Check if employee profile exists
+    const { data: employee, error: empError } = await supabase
+      .from('employees')
+      .select('*')
+      .eq('id', user.id)
+      .single();
+
+    if (empError || !employee) {
+      const role = (user.app_metadata?.role || 'owner') as UserSession['role'];
+      const session: UserSession = {
+        id: user.id,
+        email: user.email || '',
+        role: role,
+        name: user.user_metadata?.name || 'مستخدم النظام'
+      };
+      this.setSession(session);
+      return session;
+    }
+
+    const session: UserSession = {
+      id: employee.id,
+      email: employee.email,
+      role: employee.role as UserSession['role'],
+      name: employee.name,
+      organization_id: employee.organization_id
+    };
+
+    this.setSession(session);
+    return session;
+  }
+
+  async updateAdminLoginInfo(email?: string, password?: string): Promise<void> {
+    const updates: { email?: string; password?: string } = {};
+    if (email) updates.email = email;
+    if (password) updates.password = password;
+    
+    const { error } = await supabase.auth.updateUser(updates);
     if (error) throw new Error(error.message);
   }
 }

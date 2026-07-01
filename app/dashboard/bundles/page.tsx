@@ -335,10 +335,10 @@ export default function BundlesPage() {
                   id="bundle-amount"
                   type="number"
                   required
-                  min={1}
-                  step={10}
+                  min={0.01}
+                  step="any"
                   value={amount}
-                  onChange={(e) => setAmount(Math.max(1, Number(e.target.value)))}
+                  onChange={(e) => setAmount(Math.max(0.01, Number(e.target.value)))}
                   className="block w-full ps-11 pe-3.5 py-3 text-xs premium-input font-mono text-right"
                 />
               </div>
