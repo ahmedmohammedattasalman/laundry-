@@ -48,6 +48,7 @@ export default function AdminMarketingPage() {
   const [broadcastLoading, setBroadcastLoading] = useState(false);
   const [broadcastResults, setBroadcastResults] = useState<any[]>([]);
   const [showResultsModal, setShowResultsModal] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
 
   // Pre-configured templates in Arabic
   const templates = [
@@ -162,7 +163,7 @@ export default function AdminMarketingPage() {
     }
   };
 
-  const handleBroadcastSend = async () => {
+  const handleBroadcastSend = () => {
     if (!message.trim()) {
       setErrorMsg('الرجاء كتابة نص الرسالة أولاً');
       return;
@@ -174,10 +175,11 @@ export default function AdminMarketingPage() {
       return;
     }
 
-    if (!confirm(`هل أنت متأكد من رغبتك في بدء الحملة الإعلانية وإرسالها إلى ${targets.length} مغسلة الآن؟`)) {
-      return;
-    }
+    setShowConfirmModal(true);
+  };
 
+  const executeBroadcastSend = async () => {
+    setShowConfirmModal(false);
     setBroadcastLoading(true);
     setErrorMsg('');
     setSuccessMsg('');
@@ -519,6 +521,52 @@ export default function AdminMarketingPage() {
         </div>
 
       </div>
+
+      {/* Custom Confirm Modal */}
+      {showConfirmModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-black/85 backdrop-blur-sm" onClick={() => setShowConfirmModal(false)} />
+          <div className="relative bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-md p-6 shadow-2xl space-y-6 animate-zoom-in text-right">
+            
+            <div className="flex items-center gap-3.5 text-amber-500">
+              <div className="h-10 w-10 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
+                <AlertCircle className="w-5.5 h-5.5 text-amber-400 animate-pulse" />
+              </div>
+              <div>
+                <h3 className="text-sm font-extrabold text-white font-heading">تأكيد إرسال الحملة الإعلانية 📣</h3>
+                <p className="text-[9px] text-amber-400 font-bold uppercase mt-0.5">يرجى تأكيد إرسال الرسالة الجماعية</p>
+              </div>
+            </div>
+
+            <div className="bg-slate-950/60 p-4 border border-dark-border rounded-2xl text-xs space-y-2.5 leading-relaxed text-slate-300 font-sans">
+              <p>
+                أنت على وشك بدء إرسال رسالة تسويقية جماعية إلى <strong className="text-red-400 font-extrabold">{recipients.filter(r => selectedIds.includes(r.id)).length}</strong> مغسلة مسجلة في المنصة.
+              </p>
+              <div className="p-3 bg-dark-bg/60 rounded-xl border border-dark-border/40 text-[10px] text-slate-400 italic break-words line-clamp-4 leading-normal">
+                "{message.length > 150 ? `${message.substring(0, 150)}...` : message}"
+              </div>
+            </div>
+
+            <div className="flex gap-3 pt-2 font-sans">
+              <button
+                type="button"
+                onClick={executeBroadcastSend}
+                className="flex-1 py-3 bg-gradient-to-r from-red-650 to-rose-650 hover:brightness-110 text-white rounded-xl text-xs font-bold cursor-pointer transition-all text-center"
+              >
+                بدء الإرسال الآن
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowConfirmModal(false)}
+                className="px-6 py-3 bg-slate-800 hover:bg-slate-700 text-slate-350 rounded-xl text-xs font-bold cursor-pointer transition-all"
+              >
+                إلغاء
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
 
       {/* Broadcast Status Results Modal */}
       {showResultsModal && (
